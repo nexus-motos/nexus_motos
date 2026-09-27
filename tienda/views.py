@@ -509,7 +509,7 @@ def consultar_dni(request):
         return JsonResponse({'success': False, 'error': 'DNI no proporcionado.'})
     
     try:
-        token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzOTQyOSIsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvcm9sZSI6ImNvbnN1bHRvciJ9.V8tia1TjYZVf1iGqW4P27b8oTUKGcZRs2EOL54bP64Q'
+        token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0MjMwNiJ9.TImR0A9bKRmlLp6dNXh5lmQDf9zSvBoTPWQuiRFNLes'
         url = f"https://api.factiliza.com/v1/dni/info/{dni}"
         headers = {'Authorization': f'Bearer {token}'}
         response = requests.get(url, headers=headers)
