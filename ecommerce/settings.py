@@ -162,7 +162,9 @@ AUTH_USER_MODEL = 'tienda.TblUsuario'
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 CSRF_TRUSTED_ORIGINS = [
-    'https://nexusmotos-production-5a40.up.railway.app'
+    'https://nexusmotos.store',
+    'https://www.nexusmotos.store',
+    'https://nexusmotos-production-5a40.up.railway.app',
 ]
 
 # Configuración básica de CORS
@@ -187,7 +189,7 @@ if not DEBUG: # Solo en Producción
 # Brevo API
 BREVO_API_KEY = os.getenv("BREVO_API_KEY")
 # Remitente por defecto (tu dominio verificado en Brevo)
-DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "admin@nexusmotos.shop")
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "contacto@nexusmotos.store")
 SENDER_NAME = os.getenv("SENDER_NAME", "Nexus Motos")
 
 
