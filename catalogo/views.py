@@ -1195,7 +1195,7 @@ def test_smtp(request):
     try:
         server = smtplib.SMTP("smtp.gmail.com", 587, timeout=10)
         server.starttls()
-        server.login("nexusmotossac@gmail.com", "tu_app_password")
+        server.login("contacto@nexusmotos.store, "tu_app_password")
         return HttpResponse("✅ Conexión exitosa con Gmail SMTP")
     except Exception as e:
         return HttpResponse(f"❌ Error: {e}")
