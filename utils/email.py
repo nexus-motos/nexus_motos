@@ -1,5 +1,9 @@
 import base64
 import logging
+import threading
+import time
+from email.message import EmailMessage
+from email.utils import formatdate, make_msgid
 from typing import List, Optional, Dict, Any
 
 import requests
@@ -12,6 +16,98 @@ BREVO_API_URL = "https://api.brevo.com/v3/smtp/email"
 
 def _to_b64(data: bytes) -> str:
     return base64.b64encode(data).decode("utf-8")
+
+
+def _build_mime(
+    to_emails: List[str],
+    subject: str,
+    sender_email: str,
+    sender_name: Optional[str] = None,
+    html_content: Optional[str] = None,
+    text_content: Optional[str] = None,
+    attachments: Optional[List[Dict[str, Any]]] = None,
+    brevo_message_id: Optional[str] = None,
+) -> bytes:
+    """Reconstruye el mensaje enviado por Brevo como MIME para guardarlo en Enviados."""
+    msg = EmailMessage()
+    msg["From"] = (
+        f"{sender_name} <{sender_email}>" if sender_name else sender_email
+    )
+    msg["To"] = ", ".join(to_emails)
+    msg["Subject"] = subject
+    msg["Date"] = formatdate(localtime=True)
+    msg["Message-ID"] = make_msgid(domain=sender_email.split("@")[-1])
+    if brevo_message_id:
+        msg["X-Brevo-Message-Id"] = brevo_message_id
+
+    body = text_content or html_content or ""
+    msg.set_content(body)
+    if html_content and text_content:
+        msg.add_alternative(html_content, subtype="html")
+
+    for att in attachments or []:
+        raw = base64.b64decode(att["content"])
+        content_type = att.get("contentType", "application/octet-stream")
+        maintype, _, subtype = content_type.partition("/")
+        msg.add_attachment(
+            raw,
+            maintype=maintype or "application",
+            subtype=subtype or "octet-stream",
+            filename=att.get("name", "archivo"),
+        )
+
+    return msg.as_bytes()
+
+
+def _append_worker(mime_bytes: bytes) -> None:
+    """Ejecuta el IMAP APPEND. Corre en un hilo: nunca debe propagar errores."""
+    import imaplib
+
+    try:
+        imap = imaplib.IMAP4_SSL(
+            settings.IMAP_HOST,
+            settings.IMAP_PORT,
+            timeout=settings.IMAP_TIMEOUT,
+        )
+    except Exception as exc:
+        logger.warning("IMAP append: no se pudo conectar a %s (%s)", settings.IMAP_HOST, exc)
+        return
+
+    try:
+        imap.login(settings.IMAP_USER, settings.IMAP_PASSWORD)
+        status, data = imap.append(
+            f'"{settings.IMAP_SENT_FOLDER}"',
+            "\\Seen",
+            imaplib.Time2Internaldate(time.time()),
+            mime_bytes,
+        )
+        if status == "OK":
+            logger.info("IMAP append: copia guardada en %s", settings.IMAP_SENT_FOLDER)
+        else:
+            logger.warning(
+                "IMAP append en %s devolvio %s: %s",
+                settings.IMAP_SENT_FOLDER,
+                status,
+                data,
+            )
+    except Exception as exc:
+        logger.warning("IMAP append fallo (no afecta al envio): %s", exc)
+    finally:
+        try:
+            imap.logout()
+        except Exception:
+            pass
+
+
+def copy_to_sent(mime_bytes: bytes) -> bool:
+    """Lanza la copia a la bandeja Enviados en segundo plano. No bloquea ni lanza."""
+    if not getattr(settings, "IMAP_COPY_TO_SENT", False):
+        return False
+    if not getattr(settings, "IMAP_USER", "") or not getattr(settings, "IMAP_PASSWORD", ""):
+        logger.warning("IMAP append: IMAP_USER o IMAP_PASSWORD no configurados")
+        return False
+    threading.Thread(target=_append_worker, args=(mime_bytes,), daemon=True).start()
+    return True
 
 
 def send_email_brevo(
@@ -74,6 +170,23 @@ def send_email_brevo(
         # Log detallado para depurar
         logger.error("Brevo API error %s: %s", resp.status_code, data)
         raise RuntimeError(f"Error Brevo API ({resp.status_code}): {data}")
+
+    # Copia en la bandeja "Enviados" del buzon (solo si el envio fue aceptado)
+    try:
+        copy_to_sent(
+            _build_mime(
+                to_emails=to_emails,
+                subject=subject,
+                sender_email=sender_email,
+                sender_name=sender_name,
+                html_content=html_content,
+                text_content=text_content,
+                attachments=attachments,
+                brevo_message_id=data.get("messageId"),
+            )
+        )
+    except Exception as exc:
+        logger.warning("No se pudo preparar la copia en Enviados: %s", exc)
 
     return data
 

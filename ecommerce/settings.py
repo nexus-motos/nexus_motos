@@ -193,6 +193,16 @@ DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "contacto@nexusmotos.store"
 SENDER_NAME = os.getenv("SENDER_NAME", "Nexus Motos")
 
 
+# Copia de los correos enviados en la bandeja "Enviados" del buzon (IMAP APPEND)
+IMAP_HOST = os.getenv("IMAP_HOST", "mail.privateemail.com")
+IMAP_PORT = int(os.getenv("IMAP_PORT", "993"))
+IMAP_USER = os.getenv("IMAP_USER", "")
+IMAP_PASSWORD = os.getenv("IMAP_PASSWORD", "")
+IMAP_SENT_FOLDER = os.getenv("IMAP_SENT_FOLDER", "Sent")
+IMAP_COPY_TO_SENT = os.getenv("IMAP_COPY_TO_SENT", "false").lower() == "true"
+IMAP_TIMEOUT = int(os.getenv("IMAP_TIMEOUT", "10"))
+
+
 # Mercado Pago
 MP_PUBLIC_KEY = "APP_USR-bbfae35d-52ee-4eb5-86ce-4eaa648b3b61"
 MP_ACCESS_TOKEN = "APP_USR-6276524074281406-092719-873a45ceee13cc518c65a56389991184-2633352678"
