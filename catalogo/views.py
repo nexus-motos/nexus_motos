@@ -190,8 +190,6 @@ def busqueda_motos(request):
         filtros &= Q(prod_categoria__in=categorias)
     if motores:
         filtros &= Q(prod_motor__in=motores)
-    if precio_max:
-        filtros &= Q(tblkardex__kardex_precio_vigente__lte=precio_max)
 
     try:
         productos = TblProducto.objects.filter(filtros, prod_tipo='MOTO', prod_estado=True).select_related('tblkardex')
@@ -199,9 +197,18 @@ def busqueda_motos(request):
         # Mostrar el error solo en la consola
         print("Error:")
         print(str(e))
-    
+
+    # El slider filtra por PRECIO DE VENTA (con margen), no por costo
+    techo = float(precio_max) if precio_max else None
+
     data = []
     for p in productos:
+        kardex = getattr(p, 'tblkardex', None)
+        if kardex is None:
+            continue  # sin kardex no hay precio ni stock
+        precio = kardex.precio_venta
+        if techo is not None and precio > techo:
+            continue
         data.append({
             'id': p.prod_id,
             'nombre': p.prod_nombre,
@@ -209,7 +216,7 @@ def busqueda_motos(request):
             'motor': p.prod_motor,
             'marca': p.prod_marca,
             'categoria': p.prod_categoria,
-            'precio': float(p.tblkardex.kardex_precio_vigente),
+            'precio': precio,
             'imagen': p.prod_imagen  # asegúrate que sea URL accesible (usa MEDIA_URL si necesario)
         })
     
@@ -219,7 +226,7 @@ def detalle_moto(request, prod_id):
     producto = TblProducto.objects.get(prod_id=prod_id)
     try:
         kardex = TblKardex.objects.get(prod=producto)
-        precio = kardex.kardex_precio_vigente
+        precio = kardex.precio_venta
     except TblKardex.DoesNotExist:
         kardex = None
         precio = None
@@ -281,7 +288,7 @@ def enviar_cotizacion(request):
                 'email': email,
                 'telefono': telefono,
                 'producto': producto,
-                'precio': "{:.2f}".format(kardex.kardex_precio_vigente),
+                'precio': "{:.2f}".format(kardex.precio_venta),
                 'fecha': timezone.now().strftime("%d de %B de %Y"),
                 'cotizacion_id': "20250717-1201",  # Generar dinámicamente si se desea
                 'ruta_logo': ruta_logo.replace('\\', '/'),  # en Windows convierte \ a /
@@ -338,8 +345,6 @@ def busqueda_accesorios(request):
         filtros &= Q(prod_codigo__in=categorias)
     if marcas:
         filtros &= Q(prod_marca__in=marcas)
-    if precio_max:
-        filtros &= Q(tblkardex__kardex_precio_vigente__lte=precio_max)
 
     try:
         productos = TblProducto.objects.filter(filtros, prod_tipo='ACCESORIO', prod_estado=True).select_related('tblkardex')
@@ -347,9 +352,18 @@ def busqueda_accesorios(request):
         # Mostrar el error solo en la consola
         print("Error:")
         print(str(e))
+
+    # El slider filtra por PRECIO DE VENTA (con margen), no por costo
+    techo = float(precio_max) if precio_max else None
     
     data = []
     for p in productos:
+        kardex = getattr(p, 'tblkardex', None)
+        if kardex is None:
+            continue  # sin kardex no hay precio ni stock
+        precio = kardex.precio_venta
+        if techo is not None and precio > techo:
+            continue
         data.append({
             'id': p.prod_id,
             'nombre': p.prod_nombre,
@@ -357,7 +371,7 @@ def busqueda_accesorios(request):
             'tono': p.prod_tono,
             'marca': p.prod_marca,
             'categoria': p.prod_categoria,
-            'precio': float(p.tblkardex.kardex_precio_vigente),
+            'precio': precio,
             'imagen': p.prod_imagen  # asegúrate que sea URL accesible (usa MEDIA_URL si necesario)
         })
     
@@ -369,7 +383,7 @@ def detalle_accesorio(request, prod_id):
     try:
         kardex = TblKardex.objects.get(prod=producto)
         stock_actual = int(kardex.kardex_stock_actual or 0)
-        precio = kardex.kardex_precio_vigente
+        precio = kardex.precio_venta
     except TblKardex.DoesNotExist:
         stock_actual = 0
         precio = None
@@ -436,7 +450,7 @@ def agregar_a_carrito(request):
 
     try:
         kardex = TblKardex.objects.get(prod=producto)
-        precio = float(kardex.kardex_precio_vigente or 0)
+        precio = kardex.precio_venta
         stock_db = int(kardex.kardex_stock_actual or 0)
     except TblKardex.DoesNotExist:
         # Si no hay kardex, queda stock_db = 0
@@ -561,8 +575,48 @@ def _recalcular_resumen_y_bloqueo(carrito):
     return total, cantidad_total, total_items, bloqueo_checkout
 
 
+def _refrescar_precios_carrito(carrito):
+    """Vuelve a leer el precio de venta vigente desde el kardex.
+
+    Evita que el cliente pague un precio viejo (p.ej. el costo, de antes del
+    cambio a margen). Devuelve True si actualizó algún precio.
+    """
+    if not carrito:
+        return False
+
+    prod_ids = {int(item['prod_id']) for item in carrito.values() if item.get('prod_id')}
+    if not prod_ids:
+        return False
+
+    precios = dict(
+        TblKardex.objects.filter(prod_id__in=prod_ids).values_list(
+            'prod_id', 'kardex_precio_vigente', 'kardex_porcentaje_utilidad'
+        )
+    )
+
+    cambio = False
+    for item in carrito.values():
+        prod_id = item.get('prod_id')
+        if not prod_id:
+            continue
+        datos = precios.get(int(prod_id))
+        if not datos:
+            continue
+        costo, margen = float(datos[0] or 0), float(datos[1] or 0)
+        precio_nuevo = 0.0 if margen >= 100 else round(costo / (1 - margen / 100), 2)
+        if abs(float(item.get('precio', 0) or 0) - precio_nuevo) > 0.004:
+            item['precio'] = precio_nuevo
+            cambio = True
+
+    return cambio
+
+
 def vista_carrito(request):
     carrito = request.session.get('carrito', {})
+
+    if _refrescar_precios_carrito(carrito):
+        request.session['carrito'] = carrito
+        request.session.modified = True
 
     productos = []
     bloqueo_checkout = False
@@ -904,6 +958,12 @@ def numero_a_letras(numero):
 def registrar_venta(request):
     
     carrito = request.session.get('carrito', [])
+
+    # Última barrera: el precio se cobra siempre el vigente del kardex
+    if _refrescar_precios_carrito(carrito):
+        request.session['carrito'] = carrito
+        request.session.modified = True
+
     cliente_id = request.session.get('cliente_id')
     factura_tmp = request.session.get('factura_tmp')
     cliente_new_pwd = request.session.get('cliente_nuevo_pwd')
@@ -1020,14 +1080,22 @@ def registrar_venta(request):
         subtotal_item = float(item["precio"]) * cantidad
 
         # Crear detalle-venta
-        detventa =TblDetVenta.objects.create(
+        # obtener costo vigente al momento de vender (online)
+        try:
+            kv_online = TblKardex.objects.filter(prod_id=prod_id).first()
+            costo_vigente_online = float(kv_online.kardex_precio_vigente) if kv_online else 0.0
+        except Exception:
+            costo_vigente_online = 0.0
+
+        detventa = TblDetVenta.objects.create(
             venta=venta,
             prod_id=prod_id,
             det_venta_cantidad=cantidad,
             det_venta_precio_unitario=float(item['precio']),
             det_venta_subtotal=subtotal_item,
             det_venta_dcto=float(0),
-            det_venta_total=subtotal_item
+            det_venta_total=subtotal_item,
+            det_venta_precio_costo=costo_vigente_online
         )
 
         precio_salida = float(subtotal_item / cantidad if cantidad else 0)

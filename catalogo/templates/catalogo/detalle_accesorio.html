@@ -108,7 +108,7 @@
                 <div class="card-body">
                   <h6 class="text-danger fw-bold">{{ rel.prod_marca }}</h6>
                   <p class="mb-1">{{ rel.prod_modelo }}</p>
-                  <p class="fw-bold text-primary">S/. {{ rel.tblkardex.kardex_precio_vigente|floatformat:2 }}</p>
+                  <p class="fw-bold text-primary">S/. {{ rel.tblkardex.precio_venta|floatformat:2 }}</p>
                   <a href="{% url 'detalle_accesorio' rel.prod_id %}" class="btn btn-sm btn-outline-primary mt-2">Ver</a>
                 </div>
               </div>

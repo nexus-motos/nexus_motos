@@ -65,7 +65,7 @@
                                         <td>{{ venta.usuario.usuario_nombre }} {{ venta.usuario.usuario_paterno }}</td>
                                         <td>{{ venta.metodo_pago.metodo_pago_descrip }}</td>
                                         <td>{{ venta.venta_subtotal }}</td>
-                                        <td>{{ venta.venta_igv }}</td>
+                                        <td>{{ venta.venta_costo_igv }}</td>
                                         <td>{{ venta.venta_total }}</td>
                                         <td style="text-align: left;">
                                             <span class="badge {% if estado == 'PAGADO' %}bg-success{% else %}bg-warning text-dark{% endif %}">{{ estado }}</span>

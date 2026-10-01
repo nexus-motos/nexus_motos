@@ -196,14 +196,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
     }
   
-    window.agregarArticulo = function (id, nombre, modelo, marca, categoria, descuento, stock, precioVigente, utilidad) {
+    window.agregarArticulo = function (id, nombre, modelo, marca, categoria, descuento, stock, precioVenta, utilidad) {
       if (articulosSeleccionados[id]) return;
   
       const stockFinal = parseInt(stock);
       articulosSeleccionados[id] = { cantidad: 1, precio: 0, descuento: descuento, stock: stockFinal };
       
-      let precioFinal = parseFloat(precioVigente) + (parseFloat(precioVigente) * (parseFloat(utilidad) / 100));
-      precioFinal = precioFinal.toFixed(2);
+      // El precio ya llega calculado con margen desde el backend (TblKardex.precio_venta)
+      const precioFinal = parseFloat(precioVenta).toFixed(2);
 
       const fila = `
         <tr id="fila_${id}">

@@ -66,8 +66,8 @@ document.addEventListener("DOMContentLoaded", function () {
                     salida.numero_doc,
                     salida.motivo,
                     salida.costo_total.toFixed(2),
-                    (parseFloat(salida.costo_total)-(parseFloat(salida.costo_total)/1.2)).toFixed(2),
-                    ((parseFloat(salida.costo_total)-(parseFloat(salida.costo_total)/1.2))/1.18).toFixed(2),
+                    (parseFloat(salida.costo_total)-parseFloat(salida.costo_mercancia)).toFixed(2),
+                    ((parseFloat(salida.costo_total)-parseFloat(salida.costo_mercancia))/1.18).toFixed(2),
                     salida.total_igv.toFixed(2)
                 ]));
                 tabla.rows.add(filas);

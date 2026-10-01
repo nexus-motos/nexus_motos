@@ -196,6 +196,7 @@ class TblDetVenta(models.Model):
     det_venta_subtotal = models.DecimalField(max_digits=8, decimal_places=2)
     det_venta_dcto = models.DecimalField(max_digits=8, decimal_places=2)
     det_venta_total = models.DecimalField(max_digits=8, decimal_places=2)
+    det_venta_precio_costo = models.DecimalField(max_digits=8, decimal_places=2, default=0)
     prod = models.ForeignKey('TblProducto', models.DO_NOTHING)
     venta = models.ForeignKey('TblVenta', models.DO_NOTHING)
 
@@ -253,6 +254,19 @@ class TblKardex(models.Model):
     class Meta:
         managed = False
         db_table = 'tbl_kardex'
+
+    @property
+    def precio_venta(self):
+        """Precio de venta calculado a partir del margen (no markup).
+
+        costo + margen = precio  ->  precio = costo / (1 - margen/100)
+        Con margen 20%: precio = costo / 0.80
+        """
+        costo = float(self.kardex_precio_vigente or 0)
+        margen = float(self.kardex_porcentaje_utilidad or 0)
+        if margen >= 100:
+            return 0.0
+        return round(costo / (1 - margen / 100), 2)
 
 
 class TblMetodoPago(models.Model):

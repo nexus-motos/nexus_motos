@@ -263,7 +263,7 @@
                           '{{ p.prod_categoria|escapejs }}',
                           {{ p.prod_porcenta_dcto|default:0 }},
                           {{ p.tblkardex.kardex_stock_actual|default:0 }},
-                          {{ p.tblkardex.kardex_precio_vigente|default:"0.00" }},
+                          {{ p.tblkardex.precio_venta|default:"0.00" }},
                           {{ p.tblkardex.kardex_porcentaje_utilidad|default:"0.00" }}
                         )"
                         {% if p.tblkardex.kardex_stock_actual|default:0 <= 0 %} disabled {% endif %}

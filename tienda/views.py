@@ -177,16 +177,28 @@ def api_dashboard_overview(request):
         tienda_n = 0
         online_n = 0
         for v in ventas_mes:
-            vt = float(v.venta_total)
-            u = (vt - (vt / 1.2)) / 1.18
-            util += u
             if v.venta_online:
                 online_n += 1
             else:
                 tienda_n += 1
-        utilidades.append(round(util, 2))
+        utilidades.append(0)  # se recalcula abajo con det_venta
         ventas_canal_tienda.append(tienda_n)
         ventas_canal_online.append(online_n)
+
+    # Utilidad mensual desde det_venta (con costo guardado)
+    utilidades = []
+    for (start, end) in month_ranges:
+        agg = TblDetVenta.objects.filter(
+            venta__venta_fecha_venta__range=(start, end),
+            venta__venta_eliminado=False
+        ).aggregate(
+            ingreso=Sum('det_venta_total'),
+            costo=Sum(F('det_venta_cantidad') * F('det_venta_precio_costo')),
+        )
+        ingreso = float(agg['ingreso'] or 0)
+        costo = float(agg['costo'] or 0)
+        util_neta = (ingreso - costo) / 1.18
+        utilidades.append(round(util_neta, 2))
 
     # Más vendido por tipo (por mes)
     top_cant_moto = []
@@ -302,11 +314,16 @@ def api_dashboard_filter(request):
     total_ventas = TblSalida.objects.filter(salida_fecha__range=(start_dt, end_dt), salida_eliminado=False) \
         .aggregate(s=Sum("salida_costo_total"))["s"] or 0
 
-    util = 0.0
-    for s in TblSalida.objects.filter(salida_fecha__range=(start_dt, end_dt), salida_eliminado=False):
-        if s.salida_costo_total is None: continue
-        vt = float(s.salida_costo_total)
-        util += (vt - (vt / 1.2)) / 1.18
+    agg_util = TblDetVenta.objects.filter(
+        venta__venta_fecha_venta__range=(start_dt, end_dt),
+        venta__venta_eliminado=False
+    ).aggregate(
+        ingreso=Sum('det_venta_total'),
+        costo=Sum(F('det_venta_cantidad') * F('det_venta_precio_costo')),
+    )
+    ingreso_u = float(agg_util['ingreso'] or 0)
+    costo_u = float(agg_util['costo'] or 0)
+    util = (ingreso_u - costo_u) / 1.18
 
     # Top 8 artículos más vendidos (por det_salida_cantidad)
     det = TblDetSalida.objects.filter(
@@ -737,7 +754,7 @@ def detalle_articulo(request, producto_id):
 
     # Obtener el stock desde el Kardex
     try:
-        precio_vigente = float(producto.tblkardex.kardex_precio_vigente)*1.2
+        precio_vigente = producto.tblkardex.precio_venta
     except TblKardex.DoesNotExist:
         precio_vigente = 0
 
@@ -1331,6 +1348,13 @@ def agregar_venta(request):
                 productos_json = request.POST.get('productos_json')
                 total_productos = json.loads(productos_json)
                 for item in total_productos:
+                    # obtener costo vigente al momento de vender
+                    try:
+                        kv = TblKardex.objects.filter(prod_id=item['id']).first()
+                        costo_vigente = float(kv.kardex_precio_vigente) if kv else 0.0
+                    except Exception:
+                        costo_vigente = 0.0
+
                     TblDetVenta.objects.create(
                         venta=venta,
                         prod_id=item['id'],
@@ -1338,7 +1362,8 @@ def agregar_venta(request):
                         det_venta_precio_unitario=float(item['precio']),
                         det_venta_subtotal=float(item['costo']),
                         det_venta_dcto=float(item['descuentoT']),
-                        det_venta_total=float(item['subtotal'])
+                        det_venta_total=float(item['subtotal']),
+                        det_venta_precio_costo=costo_vigente
                     )
             except Exception as e:
                 print("Error al guardar TblDetVenta:", e)
@@ -1852,8 +1877,19 @@ def filtrar_salidas(request):
 
     salidas = TblSalida.objects.filter(filtros).select_related('usuario', 'tipo_doc_almacen')
 
+    # Costo de mercancia por salida.
+    # tbl_det_venta no tiene FK directa a tbl_salida; se enlaza por venta_id.
+    venta_ids = [c.venta_id for c in salidas if c.venta_id]
+    costo_por_venta = dict(
+        TblDetVenta.objects.filter(venta_id__in=venta_ids)
+        .values('venta_id')
+        .annotate(costo=Sum(F('det_venta_cantidad') * F('det_venta_precio_costo')))
+        .values_list('venta_id', 'costo')
+    )
+
     data = []
     for c in salidas:
+        costo_merc = float(costo_por_venta.get(c.venta_id, 0) or 0)
         data.append({
             'fecha': c.salida_fecha.strftime('%Y-%m-%d'),
             'usuario': f"{c.usuario.usuario_nombre} {c.usuario.usuario_paterno}",
@@ -1861,6 +1897,7 @@ def filtrar_salidas(request):
             'numero_doc': c.salida_num_doc,
             'motivo': c.salida_motivo,
             'costo_total': float(c.salida_costo_total),
+            'costo_mercancia': costo_merc,
             'total_igv': float(c.salida_costo_igv)
         })
 
@@ -2057,7 +2094,7 @@ def reporte_productos(request):
     for producto in productos:
         producto.descuento_porcentaje = int(producto.prod_porcenta_dcto or 0)
         producto.stock_actual = producto.tblkardex.kardex_stock_actual
-        producto.precio_vigente = float(producto.tblkardex.kardex_precio_vigente or 0)*1.2
+        producto.precio_vigente = producto.tblkardex.precio_venta
 
     context = {
         'breadcrumbs': [['reportes', '']],
