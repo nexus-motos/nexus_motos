@@ -2,3 +2,7 @@ venv
 __pycache__
 db.sqlite3
 /tienda/static/
+backups/
+local.env
+get-pip.py
+.static_debug/

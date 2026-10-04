@@ -86,15 +86,18 @@ WSGI_APPLICATION = 'ecommerce.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+# Las variables DB_* permiten apuntar a una base local sin tocar este archivo.
+# Si no estan definidas (Railway, produccion) cae a los valores de produccion.
+# Ver AGENTS.md seccion "Entorno local".
 DATABASES = {
     # 'default': dj_database_url.config(default=config('DATABASE_URL'))
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'nexus_motos',
-        'USER': 'root',
-        'PASSWORD': 'dBfhinxPvthZKmapGsjixmRcPyTWTBzC',
-        'HOST': 'centerbeam.proxy.rlwy.net',
-        'PORT': '43371',
+        'NAME': os.environ.get('DB_NAME', 'nexus_motos'),
+        'USER': os.environ.get('DB_USER', 'root'),
+        'PASSWORD': os.environ.get('DB_PASSWORD', 'dBfhinxPvthZKmapGsjixmRcPyTWTBzC'),
+        'HOST': os.environ.get('DB_HOST', 'centerbeam.proxy.rlwy.net'),
+        'PORT': os.environ.get('DB_PORT', '43371'),
     }
 }
 
@@ -148,9 +151,20 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 #    BASE_DIR / 'tienda' / 'static',
 #]
 
-STATICFILES_DIRS = [
-    #os.path.join(BASE_DIR, 'staticfiles'),
-]
+# Este proyecto no tiene directorios */static en las apps: los assets viven
+# directamente en staticfiles/ (que ademas es STATIC_ROOT). En produccion los
+# sirve WhiteNoise leyendo STATIC_ROOT, asi que no hace falta ninguna fuente.
+#
+# En DEBUG el runserver de Django no busca assets dentro de STATIC_ROOT, y
+# ademas Django prohibe (staticfiles.E002) poner STATIC_ROOT en
+# STATICFILES_DIRS. Por eso en local movemos STATIC_ROOT a una carpeta
+# descartable (.static_debug, sin uso real) y usamos staticfiles/ como fuente.
+# Con DEBUG=False esto no aplica y produccion queda exactamente como estaba.
+if DEBUG:
+    STATIC_ROOT = os.path.join(BASE_DIR, '.static_debug')
+    STATICFILES_DIRS = [
+        os.path.join(BASE_DIR, 'staticfiles'),
+    ]
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
