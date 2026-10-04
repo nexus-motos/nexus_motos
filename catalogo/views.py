@@ -192,7 +192,7 @@ def busqueda_motos(request):
         filtros &= Q(prod_motor__in=motores)
 
     try:
-        productos = TblProducto.objects.filter(filtros, prod_tipo='MOTO', prod_estado=True).select_related('tblkardex')
+        productos = TblProducto.objects.filter(filtros, prod_tipo='MOTOCICLETA', prod_estado=True).select_related('tblkardex')
     except Exception as e:
         # Mostrar el error solo en la consola
         print("Error:")

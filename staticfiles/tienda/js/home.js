@@ -180,7 +180,7 @@ function drawBarTopTipo6M(d){
     data:{
       labels:d.labels_6m,
       datasets:[
-        {label:'MOTO', data:d.top_mes_moto, backgroundColor:palette.ambar/*, borderRadius:6*/},
+        {label:'MOTOCICLETA', data:d.top_mes_moto, backgroundColor:palette.ambar/*, borderRadius:6*/},
         {label:'ACCESORIO', data:d.top_mes_accesorio, backgroundColor:palette.verde/*, borderRadius:6*/},
       ]
     },
@@ -196,7 +196,7 @@ function drawBarTopTipo6M(d){
               let value = context.raw;
               let idx = context.dataIndex;
 
-              if(context.dataset.label === "MOTO"){
+              if(context.dataset.label === "MOTOCICLETA"){
                 return `${context.dataset.label}: ${value} (${d.nombre_mes_moto[idx]})`;
               } else {
                 return `${context.dataset.label}: ${value} (${d.nombre_mes_accesorio[idx]})`;

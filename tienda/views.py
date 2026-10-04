@@ -31,6 +31,7 @@ import traceback
 import requests
 from django.http import JsonResponse, HttpResponse, HttpResponseForbidden, HttpResponseBadRequest
 from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.cache import never_cache
 
 from django.contrib.auth import get_user_model
 from django.utils.dateparse import parse_datetime, parse_date
@@ -96,7 +97,7 @@ def home(request):
     # KPI circulares (cuenta inicial para la primera sección)
     clientes = TblCliente.objects.count()
     proveedores = TblProveedor.objects.count()
-    motos = TblProducto.objects.filter(prod_tipo__iexact="MOTO").count()
+    motos = TblProducto.objects.filter(prod_tipo__iexact="MOTOCICLETA").count()
     accesorios = TblProducto.objects.filter(prod_tipo__iexact="ACCESORIO").count()
 
     # Fechas por defecto de la 3ra sección
@@ -229,7 +230,7 @@ def api_dashboard_overview(request):
         max_acc, nombre_acc = 0, ""
         for pid, cant in sum_por_prod.items():
             tipo = tipo_por_prod.get(pid, "")
-            if tipo == "MOTO":
+            if tipo == "MOTOCICLETA":
                 if cant > max_moto:
                     max_moto = cant
                     nombre_moto = nombre_por_prod.get(pid, "")
@@ -379,7 +380,7 @@ def api_dashboard_filter(request):
         salida__salida_eliminado=False
     ).select_related("prod")
 
-    qty_tipo = {"MOTO": 0, "ACCESORIO": 0}
+    qty_tipo = {"MOTOCICLETA": 0, "ACCESORIO": 0}
     for d in det_sal:
         t = (d.prod.prod_tipo or "").upper()
         if t in qty_tipo:
@@ -415,8 +416,8 @@ def api_dashboard_filter(request):
             "values": top5_v_values
         },
         "por_tipo": {
-            "labels": ["MOTO", "ACCESORIO"],
-            "values": [qty_tipo["MOTO"], qty_tipo["ACCESORIO"]]
+            "labels": ["MOTOCICLETA", "ACCESORIO"],
+            "values": [qty_tipo["MOTOCICLETA"], qty_tipo["ACCESORIO"]]
         },
         "canal": {
             "labels": ["Tienda", "Online"],
@@ -430,7 +431,22 @@ def api_dashboard_filter(request):
     }
     return JsonResponse(data)
 
+def _redirect_post_login(user):
+    """Destino del usuario autenticado según su estado y tipo."""
+    if user.usuario_cambiopwd:
+        return redirect('cambiar_contrasena')  # Vista temporal para cambio de contraseña
+
+    tipo_usuario = user.tipo_usuario.tipo_usuario_descrip.lower()
+    if tipo_usuario == 'cliente':
+        return redirect('inicio')  # URL que corresponde a la tienda online
+    return redirect('home')  # página interna para empleados/admin (personal autorizado)
+
+@never_cache  # evita que el navegador muestre una copia vieja (con token CSRF caducado) al retroceder
 def login_view(request):
+    # Si ya hay sesión, no mostrar el login: llevarlo a su página
+    if request.user.is_authenticated:
+        return _redirect_post_login(request.user)
+
     if request.method == 'POST':
         form = LoginForm(request.POST)
         if form.is_valid():
@@ -456,15 +472,8 @@ def login_view(request):
                         except TblCliente.DoesNotExist:
                             request.session['cliente_id'] = None
 
-                        if user.usuario_cambiopwd:
-                            return redirect('cambiar_contrasena')  # Vista temporal para cambio de contraseña
+                        return _redirect_post_login(user)
 
-                        tipo_usuario = user.tipo_usuario.tipo_usuario_descrip.lower()
-                        if tipo_usuario == 'cliente':
-                            return redirect('inicio')  # URL que corresponde a la tienda online
-                        else:
-                            return redirect('home')  # página interna para empleados/admin (personal autorizado)
-                        
                     else:
                         form.add_error('password', 'Contraseña incorrecta') # Añadir error para la contraseña incorrecta
                         #form.add_error(None, 'Contraseña incorrecta')
