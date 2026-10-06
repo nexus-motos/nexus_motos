@@ -24,10 +24,25 @@
             padding: 5px;
             text-align: right;
         }
+        /* Productos: sin líneas horizontales entre registros, solo bordes verticales */
+        .tabla td {
+            border-top: 0;
+            border-bottom: 0;
+        }
+        /* Línea que cierra la cabecera */
+        .tabla .fila-primera td {
+            border-top: 1px solid #000;
+        }
+        .tabla-pie td {
+            border: 0;
+            padding: 1px 5px 1px 0;
+            text-align: left;
+        }
         .tabla th {
             background-color: #eee;
             border: 1px solid #000;
-            padding: 5px;
+            padding: 3px 2px 0 2px;
+            line-height: 1.15;
             text-align: center;
             vertical-align: middle;
         }
@@ -47,7 +62,17 @@
         }
         .totales {
             width: 100%;
-            margin-top: 10px;
+            margin-top: 0;
+        }
+        /* Recuadro exterior de SON/totales: el borde va en las celdas del perímetro */
+        .totales td {
+            border: 0;
+        }
+        .totales .borde-der {
+            border-right: 1px solid #000;
+        }
+        .totales .borde-inf {
+            border-bottom: 1px solid #000;
         }
         .totales td {
             padding: 3px;
@@ -68,7 +93,7 @@
         <tr>
             <!-- Columna izquierda: datos de la empresa -->
             <td style="width: 65%; vertical-align: top;">
-                <h2 style="margin: 0; font-size: 20px;">NEXUS MOTOS</h2>
+                <img src="{{ logo_path }}" alt="NEXUS MOTOS" style="width: 153px; height: 45px;"><br><br>
                 REPRESENTACIONES MRS S.A.C.<br>
                 Telf. 976970400<br>
                 Email: contacto@nexusmotos.store<br>
@@ -78,7 +103,7 @@
             <!-- Columna derecha: datos del comprobante -->
             <td style="width: 35%; text-align: center; vertical-align: middle; border: 1px solid black; font-size: 17px;">
                 <strong>R.U.C. 20607436488</strong><br>
-                <strong>{{ venta.venta_tipo_comprobante|upper }}</strong><br>
+                <strong>{{ venta.venta_tipo_comprobante|upper }} ELECTRÓNICA</strong><br>
                 <strong>{{ venta.venta_nro_documento }}</strong>
             </td>
         </tr>
@@ -95,41 +120,66 @@
     <table class="tabla">
         <thead>
             <tr>
-                <th>CANTIDAD</th>
-                <th>DESCRIPCIÓN</th>
-                <th>PRECIO UNITARIO</th>
-                <th>IMPORTE</th>
+                <th style="width: 15%;">CANTIDAD</th>
+                <th style="width: 50%;">DESCRIPCIÓN</th>
+                <th style="width: 17%;">PRECIO<br>UNITARIO</th>
+                <th style="width: 18%;">IMPORTE</th>
             </tr>
         </thead>
         <tbody>
             {% for item in detalle_venta %}
-            <tr>
-                <td>{{ item.det_venta_cantidad }}</td>
-                <td style="width: 40%;">{{ item.prod.prod_nombre }} - {{ item.prod.prod_modelo }} - {{ item.prod.prod_marca }} - {{ item.prod.prod_categoria }}</td>
-                <td>S/. {{ item.det_venta_precio_unitario }}</td>
-                <td>S/. {{ item.det_venta_total }}</td>
+            <tr{% if forloop.first %} class="fila-primera"{% endif %}>
+                <td style="vertical-align: top;">{{ item.det_venta_cantidad }}</td>
+                <td style="width: 50%; text-align: left; vertical-align: top;">
+                    {{ item.prod.prod_codigo }} {{ item.prod.prod_marca }} {{ item.prod.prod_modelo }} {{ item.prod.prod_categoria|default_if_none:"" }}
+                    {% if item.series_texto %}<br>SERIE: {{ item.series_texto }}{% endif %}
+                    {% if item.prod.prod_cilindrada %}<br>CILINDRADA: {{ item.prod.prod_cilindrada }}{% endif %}
+                    {% if item.prod.prod_tono %}<br>COLOR: {{ item.prod.prod_tono }}{% endif %}
+                    {% if item.prod.prod_aniofabricacion %}<br>AÑO FABRICACIÓN: {{ item.prod.prod_aniofabricacion }}{% endif %}
+                </td>
+                <td style="vertical-align: top;">S/. {{ item.det_venta_precio_unitario }}</td>
+                <td style="vertical-align: top;">S/. {{ item.det_venta_total }}</td>
             </tr>
             {% endfor %}
+            {# Fila de relleno: completa el 30% de la página y cierra el bloque con la línea inferior #}
+            <tr>
+                <td style="height: {{ relleno_altura|default:1 }}px; border-bottom: 1px solid #000;"></td>
+                <td style="border-bottom: 1px solid #000;"></td>
+                <td style="border-bottom: 1px solid #000;"></td>
+                <td style="border-bottom: 1px solid #000;"></td>
+            </tr>
         </tbody>
     </table>
 
     <table class="totales">
         <tr>
-            <td rowspan="4" style="width: 65%; text-align: left; vertical-align: top;"><strong>SON:</strong> {{ total_letras|upper }}</td>
+            <td rowspan="4" class="borde-inf" style="width: 65%; text-align: left; vertical-align: top; border-left: 1px solid #000;"><strong>SON:</strong> {{ total_letras|upper }}</td>
             <td class="info-right"><strong>DESCUENTO:</strong></td>
-            <td class="info-right">S/. {{ descuento_total }}</td>
+            <td class="info-right borde-der">S/. {{ descuento_total }}</td>
         </tr>
         <tr>
             <td class="info-right"><strong>SUB TOTAL:</strong></td>
-            <td class="info-right">S/. {{ venta.venta_subtotal }}</td>
+            <td class="info-right borde-der">S/. {{ venta.venta_subtotal }}</td>
         </tr>
         <tr>
             <td class="info-right"><strong>IGV 18%:</strong></td>
-            <td class="info-right">S/. {{ venta.venta_costo_igv }}</td>
+            <td class="info-right borde-der">S/. {{ venta.venta_costo_igv }}</td>
         </tr>
         <tr>
-            <td class="info-right"><strong>TOTAL:</strong></td>
-            <td class="info-right">S/. {{ venta.venta_total }}</td>
+            <td class="info-right borde-inf"><strong>TOTAL:</strong></td>
+            <td class="info-right borde-der borde-inf">S/. {{ venta.venta_total }}</td>
+        </tr>
+    </table>
+
+    <hr size="1px" color="black">
+    <table class="tabla-pie" width="260">
+        <tr>
+            <td width="90"><strong>Vendedor:</strong></td>
+            <td width="170">{{ venta.usuario.usuario_nombre }} {{ venta.usuario.usuario_paterno }}</td>
+        </tr>
+        <tr>
+            <td><strong>Forma de pago:</strong></td>
+            <td>{{ venta.metodo_pago.metodo_pago_descrip }}</td>
         </tr>
     </table>
 

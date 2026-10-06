@@ -128,7 +128,8 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+# La BD guarda UTC (USE_TZ=True); TIME_ZONE solo define la hora que se muestra/filtra (Perú, UTC-5, sin DST).
+TIME_ZONE = 'America/Lima'
 
 USE_I18N = True
 

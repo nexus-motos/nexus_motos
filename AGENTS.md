@@ -49,7 +49,10 @@ mysql -h centerbeam.proxy.rlwy.net -P 43371 -u root -p nexus_motos
   - **Cambiar comportamiento de stock/margen casi siempre significa editar el SP**, no el Python. El SP crea kardex con `kardex_stock_minimo = 5` y `kardex_porcentaje_utilidad = 20` hardcodeados.
   - Al borrar entradas/ventas hay que revertir el kardex a mano; no se recalcula solo.
   - **Restaurar el SP localmente** volcar con `--routines` y cambiar `DEFINER=\`root\`@\`%\`` por `DEFINER=CURRENT_USER`, si no MySQL local lo rechaza con error 1449. Dump de referencia en `backups/nexus_local_*.sql`.
-- Timezone: `TIME_ZONE = 'UTC'`, `USE_TZ = True`, y MySQL corre en UTC. El usuario está en **UTC−5 (Perú)**. Las fechas se guardan bien en UTC pero **la UI las muestra en UTC**, 5 horas adelantadas. Es preexistente, no lo introduzcas como bug nuevo.
+- Timezone: `USE_TZ = True`, `TIME_ZONE = 'America/Lima'`. **La BD guarda UTC** (Django convierte al escribir) y la UI/filtros usan hora de Lima (UTC−5, sin DST). MySQL local corre en −05 y Railway en UTC, así que **no uses `NOW()` en SQL para fechas que Django también lee: usa `UTC_TIMESTAMP()`** (el trigger del historial y `sp_actualizar_kardex` lo hacen; ver `sql/sp_actualizar_kardex_utc.sql`).
+  - **No filtres con `__date`**: MySQL no tiene tablas de zonas y `CONVERT_TZ` devuelve NULL. Usa los helpers `inicio_dia()` / `fin_dia_exclusivo()` de `tienda/views.py` con `__gte` / `__lt`.
+  - Al formatear con `strftime` un datetime de la BD, pásalo antes por `timezone.localtime()`. Para "hoy" usa `timezone.localdate()`, no `date.today()` (el servidor de Railway está en UTC).
+  - Columnas `DateField` (`financia_fecha_registro`, `det_finan_*`) guardan la fecha de Lima, sin conversión.
 - Semántica de IGV: `*_igv` es el **porcentaje** (18), `*_costo_igv` es el **monto**. Hay que respetar ese par en cualquier campo nuevo.
 
 ## Fórmulas de precio (no hardcodear)

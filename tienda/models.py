@@ -269,6 +269,22 @@ class TblKardex(models.Model):
         return round(costo / (1 - margen / 100), 2)
 
 
+class VwPrecioVentaVigencia(models.Model):
+    """Vista sobre tbl_kardex_historial; fecha_fin = inicio del siguiente periodo (NULL = vigente)."""
+    hist_id = models.IntegerField(primary_key=True)
+    prod = models.ForeignKey('TblProducto', models.DO_NOTHING, db_constraint=False)
+    hist_costo = models.DecimalField(max_digits=7, decimal_places=2)
+    hist_margen = models.DecimalField(max_digits=5, decimal_places=2)
+    hist_precio_venta = models.DecimalField(max_digits=9, decimal_places=2)
+    hist_stock = models.IntegerField()
+    fecha_inicio = models.DateTimeField()
+    fecha_fin = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'vw_precio_venta_vigencia'
+
+
 class TblMetodoPago(models.Model):
     metodo_pago_id = models.AutoField(primary_key=True)
     metodo_pago_descrip = models.CharField(max_length=45)

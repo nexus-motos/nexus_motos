@@ -63,7 +63,7 @@
                                         <td>{{ ingreso.entrada_igv }}</td>
                                         <td>{{ ingreso.entrada_costo_total }}</td>
                                         <td>{{ ingreso.usuario.usuario_nombre }} {{ ingreso.usuario.usuario_paterno }} {{ ingreso.usuario.usuario_materno }}</td>
-                                        <td>{{ ingreso.entrada_fecha|date:"d/m/Y H:i:s" }}</td>
+                                        <td data-order="{{ ingreso.entrada_fecha|date:'Y-m-d H:i:s' }}">{{ ingreso.entrada_fecha|date:"d/m/Y H:i:s" }}</td>
                                         <td>
                                             <a href="{% url 'detalle_ingreso' ingreso.entrada_id %}" class="btn btn-sm btn-icon btn-outline-primary" title="Ver"><i class="bx bx-show"></i></a>
                                         </td>

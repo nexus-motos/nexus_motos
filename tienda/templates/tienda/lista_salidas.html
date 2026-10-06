@@ -62,7 +62,7 @@
                                         <td>{{ salida.salida_igv }}</td>
                                         <td>{{ salida.salida_costo_total }}</td>
                                         <td>{{ salida.usuario.usuario_nombre }} {{ salida.usuario.usuario_paterno }} {{ salida.usuario.usuario_materno }}</td>
-                                        <td>{{ salida.salida_fecha|date:"d/m/Y H:i:s" }}</td>
+                                        <td data-order="{{ salida.salida_fecha|date:'Y-m-d H:i:s' }}">{{ salida.salida_fecha|date:"d/m/Y H:i:s" }}</td>
                                         <td>
                                             <a href="#" class="btn btn-sm btn-icon btn-outline-primary" title="Ver"><i class="bx bx-show"></i></a>
                                         </td>

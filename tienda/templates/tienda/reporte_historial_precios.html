@@ -1,0 +1,96 @@
+{% extends 'tienda/base2.html'%}
+{% load static %}
+
+{% block title %} - Reporte Hist. Precios{% endblock %}
+
+{% block extra_css %}
+    <link rel="stylesheet" href="{% static 'assets/vendor/libs/DataTables/DataTables-1.13.8/css/dataTables.bootstrap5.min.css' %}" />
+    <link rel="stylesheet" href="{% static 'assets/vendor/libs/DataTables/Buttons-2.4.2/css/buttons.bootstrap5.min.css' %}" />
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12 col-lg-12 col-xl-12">
+        <div class="card mb-4">
+            <div class="card-header">
+              <div class="card-title header-elements">
+                <h4 class="m-0 me-2 text-primary">Reporte historial de precios de venta</h4>
+              </div>
+            </div>
+            <div class="card-body">
+                {% csrf_token %}
+                <div class="row">
+                  <div class="col-12 mb-4 order-0">
+                    <div class="row g-3">
+                      <div class="col-sm-12 col-md-3 col-lg-3">
+                        <div class="form-group">
+                          <label class="form-label">Fecha Inicio:</label>
+                          <input type="date" id="fecha_inicio" class="form-control">
+                        </div>
+                      </div>
+                      <div class="col-sm-12 col-md-3 col-lg-3">
+                        <div class="form-group">
+                          <label class="form-label">Fecha Fin:</label>
+                          <input type="date" id="fecha_fin" class="form-control">
+                        </div>
+                      </div>
+                      <div class="col-sm-12 col-md-4 col-lg-4">
+                        <div class="form-group">
+                          <label class="form-label">Producto:</label>
+                          <select id="producto_id" class="form-control">
+                            <option value="0">TODOS</option>
+                            {% for p in productos %}
+                              <option value="{{ p.prod_id }}">{{ p.prod_modelo }} - {{ p.prod_marca }}</option>
+                            {% endfor %}
+                          </select>
+                        </div>
+                      </div>
+                      <div class="col-sm-12 col-md-2 col-lg-2 d-flex align-items-end justify-content-end">
+                        <button id="btnBuscar" class="btn btn-primary mt-3">
+                          <span id="spinner" class="spinner-border spinner-border-sm me-1 d-none" role="status" aria-hidden="true"></span>
+                          Buscar
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="row">
+                  <div class="col-12 mb-4 order-0">
+                    <div class="table-responsive text-nowrap">
+                      <table id="tablaHistorial" class="table table-bordered w-100">
+                        <thead class="table-primary">
+                          <tr>
+                            <th class="text-center">FECHA INICIO</th>
+                            <th class="text-center">FECHA FIN</th>
+                            <th class="text-center">COSTO</th>
+                            <th class="text-center">MARGEN GANANCIA %</th>
+                            <th class="text-center">PRECIO VENTA</th>
+                            <th class="text-center">STOCK</th>
+                          </tr>
+                        </thead>
+                        <tbody></tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock%}
+
+{% block extra_js %}
+<script src="{% static 'assets/vendor/libs/DataTables/DataTables-1.13.8/js/jquery.dataTables.min.js' %}"></script>
+<script src="{% static 'assets/vendor/libs/DataTables/DataTables-1.13.8/js/dataTables.bootstrap5.min.js' %}"></script>
+<script src="{% static 'assets/vendor/libs/DataTables/Buttons-2.4.2/js/dataTables.buttons.min.js' %}"></script>
+<script src="{% static 'assets/vendor/libs/DataTables/Buttons-2.4.2/js/buttons.bootstrap5.min.js' %}"></script>
+<script src="{% static 'assets/vendor/libs/DataTables/JSZip-3.10.1/jszip.min.js' %}"></script>
+<script src="{% static 'assets/vendor/libs/DataTables/pdfmake-0.2.7/pdfmake.min.js' %}"></script>
+<script src="{% static 'assets/vendor/libs/DataTables/pdfmake-0.2.7/vfs_fonts.js' %}"></script>
+<script src="{% static 'assets/vendor/libs/DataTables/Buttons-2.4.2/js/buttons.html5.min.js' %}"></script>
+<script src="{% static 'assets/vendor/libs/DataTables/Buttons-2.4.2/js/buttons.print.min.js' %}"></script>
+<script src="{% static 'assets/vendor/libs/DataTables/Buttons-2.4.2/js/buttons.colVis.min.js' %}"></script>
+
+<script src="{% static 'tienda/js/reporte_historial_precios.js' %}"></script>
+{% endblock %}

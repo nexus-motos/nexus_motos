@@ -12,6 +12,7 @@ from django.contrib import messages
 from django.utils import timezone
 from django.conf import settings
 from utils.email import send_mail_api
+from utils.pdf_venta import preparar_detalle_pdf, ruta_logo_pdf
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 from django.urls import reverse
@@ -289,7 +290,7 @@ def enviar_cotizacion(request):
                 'telefono': telefono,
                 'producto': producto,
                 'precio': "{:.2f}".format(kardex.precio_venta),
-                'fecha': timezone.now().strftime("%d de %B de %Y"),
+                'fecha': timezone.localtime().strftime("%d de %B de %Y"),
                 'cotizacion_id': "20250717-1201",  # Generar dinámicamente si se desea
                 'ruta_logo': ruta_logo.replace('\\', '/'),  # en Windows convierte \ a /
             }
@@ -1139,6 +1140,7 @@ def registrar_venta(request):
     det_venta = TblDetVenta.objects.filter(venta=venta).select_related('prod')
     total_letras = numero_a_letras(venta.venta_total)
     email_fact_tmp = factura_tmp['correo'] if factura_tmp else None
+    det_venta, relleno_altura = preparar_detalle_pdf(venta, det_venta)
     context = {
         'venta': venta,
         'detalle_venta': det_venta,
@@ -1146,6 +1148,8 @@ def registrar_venta(request):
         'detalle_financiamiento': [],
         'descuento_total': float(0),
         'total_letras': total_letras,
+        'relleno_altura': relleno_altura,
+        'logo_path': ruta_logo_pdf(),
     }
     template = render_to_string('tienda/venta_pdf.html', context)
     pdf_file = BytesIO()

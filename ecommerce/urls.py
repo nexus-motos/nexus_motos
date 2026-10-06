@@ -86,6 +86,8 @@ urlpatterns = [
     path('buscar_movimientos/', views.buscar_movimientos, name='buscar_movimientos'),
     path('reporte_series_productos/', views.reporte_series_productos, name='reporte_series_productos'),
     path('buscar_series_productos/', views.buscar_series_productos, name='buscar_series_productos'),
+    path('reporte_historial_precios/', views.reporte_historial_precios, name='reporte_historial_precios'),
+    path('buscar_historial_precios/', views.buscar_historial_precios, name='buscar_historial_precios'),
     path('reporte_productos/', views.reporte_productos, name='reporte_productos'),
     #CATALOGO-------------
     path('catalogo/', include('catalogo.urls')),

@@ -3,6 +3,7 @@ from django import forms
 from .models import TblUsuario, TblTipoUsuario,TblCargo, TblProducto, TblProveedor,TblCliente, TblEntrada
 from django.contrib.auth.hashers import make_password
 from datetime import date, timedelta
+from django.utils import timezone
 from decimal import Decimal, ROUND_DOWN
 
 class LoginForm(forms.Form):
@@ -127,7 +128,7 @@ class RegistroUsuarioForm(forms.ModelForm):
         self.fields['cargo'].empty_label = "Seleccionar..."
 
         # Rango de año para fecha de nacimiento
-        hoy = date.today()
+        hoy = timezone.localdate()
         edad_min = hoy.replace(year=hoy.year - 70)
         edad_max = hoy.replace(year=hoy.year - 18)
         self.fields['usuario_fechanac'].widget.attrs['min'] = edad_min.isoformat()

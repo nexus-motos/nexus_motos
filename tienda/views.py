@@ -4,12 +4,12 @@ from django.shortcuts import get_object_or_404, render, redirect
 
 from django.conf import settings
 from .forms import LoginForm, RegistroUsuarioForm, ArticuloForm, ProveedorForm, ClienteForm, EditarUsuarioForm
-from .models import TblUsuario, TblProducto, TblProveedor, TblCliente, TblVenta, TblDetVenta, TblEntrada,TblTipoDocAlmacen, TblDetEntrada, TblMetodoPago, TblSalida, TblDetSalida, TblFinanciamiento, TblDetFinanciamiento, TblTipoUsuario, TblCargo, TblKardex, TblProductoSerie
+from .models import TblUsuario, TblProducto, TblProveedor, TblCliente, TblVenta, TblDetVenta, TblEntrada,TblTipoDocAlmacen, TblDetEntrada, TblMetodoPago, TblSalida, TblDetSalida, TblFinanciamiento, TblDetFinanciamiento, TblTipoUsuario, TblCargo, TblKardex, TblProductoSerie, VwPrecioVentaVigencia
 from django.contrib import messages
 from django.core.paginator import Paginator
 from datetime import datetime, date, timedelta
 from django.utils import timezone
-from django.db.models import Max, Sum, Q, F, Value, Count, Case, When, IntegerField
+from django.db.models import Max, Sum, Q, F, Value, Count, Case, When, IntegerField, DateTimeField
 from django.db.models.functions import Concat
 from django.contrib.auth.decorators import login_required
 from django.utils.decorators import method_decorator
@@ -23,6 +23,7 @@ from xhtml2pdf import pisa
 from num2words import num2words
 from django.contrib.auth.hashers import make_password
 from utils.email import send_mail_api
+from utils.pdf_venta import preparar_detalle_pdf, ruta_logo_pdf
 import random
 import string
 import json
@@ -90,6 +91,15 @@ def last_n_months(n=6, tz=None):
 
 def parse_date(s):
     return datetime.strptime(s, "%Y-%m-%d")
+
+def inicio_dia(s):
+    """'YYYY-MM-DD' -> 00:00 de ese día en la zona horaria activa (Lima), como datetime aware.
+    Se usa con __gte/__lt en vez de __date: MySQL no tiene tablas de zonas y CONVERT_TZ devolvería NULL."""
+    return timezone.make_aware(parse_date(s))
+
+def fin_dia_exclusivo(s):
+    """'YYYY-MM-DD' -> 00:00 del día siguiente (cota superior exclusiva para __lt)."""
+    return timezone.make_aware(parse_date(s) + timedelta(days=1))
 
 
 @solo_personal
@@ -695,7 +705,7 @@ def agregar_articulos(request):
 
                     producto.prod_imagen = imagen.name  # solo el nombre del archivo
 
-                producto.prod_fecha_registro = datetime.now()
+                producto.prod_fecha_registro = timezone.now()
                 producto.save()
                 return redirect('lista_articulos')
             except Exception as e:
@@ -1460,14 +1470,15 @@ def agregar_venta(request):
                         financia_tasa_interes=tasa_interes,
                         financia_total_interes=total_interes,
                         financia_monto_total=total_financiamiento,
-                        financia_fecha_registro=date.today(),
+                        financia_fecha_registro=timezone.localdate(),
                         financia_estado='PENDIENTE',
                         venta=venta
                     )
 
                     for i in range(num_cuotas):
-                        mes = date.today().month + i + 1
-                        año = date.today().year
+                        hoy_lima = timezone.localdate()
+                        mes = hoy_lima.month + i + 1
+                        año = hoy_lima.year
                         if mes > 12:
                             mes -= 12
                             año += 1
@@ -1573,7 +1584,8 @@ def generar_pdf_venta(request, venta_id):
 
     descuento_total = sum(item.det_venta_dcto for item in detalle_venta)
     total_letras = numero_a_letras(venta.venta_total)
-    
+    detalle_venta, relleno_altura = preparar_detalle_pdf(venta, detalle_venta)
+
     context = {
         'venta': venta,
         'detalle_venta': detalle_venta,
@@ -1581,6 +1593,8 @@ def generar_pdf_venta(request, venta_id):
         'detalle_financiamiento': detalle_financiamiento,
         'descuento_total': descuento_total,
         'total_letras': total_letras,
+        'relleno_altura': relleno_altura,
+        'logo_path': ruta_logo_pdf(),
     }
 
     template_path = 'tienda/venta_pdf.html'
@@ -1655,7 +1669,7 @@ def registrar_pago(request, cuota_id):
             
             cuota.det_finan_comprob_imagen = imagen.name  # solo el nombre del archivo
             cuota.det_finan_estado_pago = "PAGADO"
-            cuota.det_finan_fch_pago_realiza = date.today()
+            cuota.det_finan_fch_pago_realiza = timezone.localdate()
             cuota.save()
 
             # Verificar si todas las cuotas están pagadas
@@ -1825,9 +1839,7 @@ def filtrar_compras(request):
 
     filtros = Q()
     if fecha_inicio and fecha_fin:
-        fi = datetime.strptime(fecha_inicio, '%Y-%m-%d')
-        ff = datetime.strptime(fecha_fin, '%Y-%m-%d')
-        filtros &= Q(entrada_fecha__date__range=[fi, ff])
+        filtros &= Q(entrada_fecha__gte=inicio_dia(fecha_inicio), entrada_fecha__lt=fin_dia_exclusivo(fecha_fin))
     if proveedor_id != "":
         filtros &= Q(proveedor_id=proveedor_id)
     if usuario_id != "":
@@ -1838,7 +1850,7 @@ def filtrar_compras(request):
     data = []
     for c in compras:
         data.append({
-            'fecha': c.entrada_fecha.strftime('%Y-%m-%d'),
+            'fecha': timezone.localtime(c.entrada_fecha).strftime('%Y-%m-%d'),
             'usuario': c.usuario.usuario_nombre,
             'proveedor': c.proveedor.proveedor_nombre,
             'tipo_doc': c.tipo_doc_almacen.tipo_doc_almacen_descripcion,
@@ -1878,9 +1890,7 @@ def filtrar_salidas(request):
 
     filtros = Q()
     if fecha_inicio and fecha_fin:
-        fi = datetime.strptime(fecha_inicio, '%Y-%m-%d')
-        ff = datetime.strptime(fecha_fin, '%Y-%m-%d')
-        filtros &= Q(salida_fecha__date__range=[fi, ff])
+        filtros &= Q(salida_fecha__gte=inicio_dia(fecha_inicio), salida_fecha__lt=fin_dia_exclusivo(fecha_fin))
     if usuario_id != "":
         filtros &= Q(usuario_id=usuario_id)
 
@@ -1900,7 +1910,7 @@ def filtrar_salidas(request):
     for c in salidas:
         costo_merc = float(costo_por_venta.get(c.venta_id, 0) or 0)
         data.append({
-            'fecha': c.salida_fecha.strftime('%Y-%m-%d'),
+            'fecha': timezone.localtime(c.salida_fecha).strftime('%Y-%m-%d'),
             'usuario': f"{c.usuario.usuario_nombre} {c.usuario.usuario_paterno}",
             'tipo_doc': c.tipo_doc_almacen.tipo_doc_almacen_descripcion,
             'numero_doc': c.salida_num_doc,
@@ -1955,9 +1965,9 @@ def buscar_movimientos(request):
             # ENTRADAS
             entradas = TblDetEntrada.objects.filter(prod_id=producto)
             if fecha_inicio:
-                entradas = entradas.filter(entrada__entrada_fecha__date__gte=fecha_inicio)
+                entradas = entradas.filter(entrada__entrada_fecha__gte=inicio_dia(fecha_inicio))
             if fecha_fin:
-                entradas = entradas.filter(entrada__entrada_fecha__date__lte=fecha_fin)
+                entradas = entradas.filter(entrada__entrada_fecha__lt=fin_dia_exclusivo(fecha_fin))
 
             for e in entradas:
                 movimientos.append({
@@ -1975,9 +1985,9 @@ def buscar_movimientos(request):
             # SALIDAS
             salidas = TblDetSalida.objects.filter(prod_id=producto)
             if fecha_inicio:
-                salidas = salidas.filter(salida__salida_fecha__date__gte=fecha_inicio)
+                salidas = salidas.filter(salida__salida_fecha__gte=inicio_dia(fecha_inicio))
             if fecha_fin:
-                salidas = salidas.filter(salida__salida_fecha__date__lte=fecha_fin)
+                salidas = salidas.filter(salida__salida_fecha__lt=fin_dia_exclusivo(fecha_fin))
 
             for s in salidas:
                 movimientos.append({
@@ -2002,7 +2012,7 @@ def buscar_movimientos(request):
                 movimientos_final.append({
                     'producto_modelo': producto.prod_modelo,
                     'producto_marca': producto.prod_marca,
-                    'fecha_mov': mov['fecha_mov'].strftime('%Y-%m-%d %H:%M'),
+                    'fecha_mov': timezone.localtime(mov['fecha_mov']).strftime('%Y-%m-%d %H:%M'),
                     'tipo_mov': mov['tipo_mov'],
                     'tipo_doc': mov['tipo_doc'],
                     'num_doc': mov['num_doc'],
@@ -2052,12 +2062,22 @@ def buscar_series_productos(request):
 
         # Filtro por fechas
         if fecha_inicio:
-            series = series.filter(det_entrada__entrada__entrada_fecha__date__gte=fecha_inicio)
+            series = series.filter(det_entrada__entrada__entrada_fecha__gte=inicio_dia(fecha_inicio))
         if fecha_fin:
-            series = series.filter(det_entrada__entrada__entrada_fecha__date__lte=fecha_fin)
+            series = series.filter(det_entrada__entrada__entrada_fecha__lt=fin_dia_exclusivo(fecha_fin))
 
-        # Ordenar por fecha de entrada, luego por fecha de cambio de estado
-        series = series.order_by('det_entrada__entrada__entrada_fecha', 'prod_ser_fecha_sit')
+        # Orden: producto (para agrupar bajo su separador), fecha de entrada desc,
+        # estado (1 primero, luego 2); estado 1 por fecha_sit asc, estado 2 por fecha de salida desc
+        series = series.annotate(
+            orden_estado1=Case(When(prod_ser_estado=1, then=F('prod_ser_fecha_sit')), output_field=DateTimeField()),
+            orden_estado2=Case(When(prod_ser_estado=2, then=F('det_salida__salida__salida_fecha')), output_field=DateTimeField()),
+        ).order_by(
+            'det_entrada__prod__prod_id',
+            '-det_entrada__entrada__entrada_fecha',
+            'prod_ser_estado',
+            F('orden_estado1').asc(nulls_last=True),
+            F('orden_estado2').desc(nulls_last=True),
+        )
 
         datos = []
         productos_agregados = set()
@@ -2086,12 +2106,79 @@ def buscar_series_productos(request):
                 'separador': False,
                 'serie': serie.prod_ser_serie,
                 'situacion': serie.prod_ser_estado,
-                'fecha_entrada': serie.det_entrada.entrada.entrada_fecha.strftime('%Y-%m-%d %H:%M'),
+                'fecha_entrada': timezone.localtime(serie.det_entrada.entrada.entrada_fecha).strftime('%Y-%m-%d %H:%M'),
                 'num_doc_entrada': serie.det_entrada.entrada.entrada_num_doc,
                 'tipo_doc_entrada': serie.det_entrada.entrada.tipo_doc_almacen.tipo_doc_almacen_descripcion,
-                'fecha_salida': serie.det_salida.salida.salida_fecha.strftime('%Y-%m-%d %H:%M') if serie.det_salida else '',
+                'fecha_salida': timezone.localtime(serie.det_salida.salida.salida_fecha).strftime('%Y-%m-%d %H:%M') if serie.det_salida else '',
                 'num_doc_salida': serie.det_salida.salida.salida_num_doc if serie.det_salida else '',
                 'tipo_doc_salida': serie.det_salida.salida.tipo_doc_almacen.tipo_doc_almacen_descripcion if serie.det_salida else '',
+            })
+
+        return JsonResponse({'datos': datos})
+
+@solo_personal
+def reporte_historial_precios(request):
+    productos = TblProducto.objects.filter(tblkardex__isnull=False)
+
+    context = {
+        'breadcrumbs': [['Reportes', '']],
+        'menu_padre': 'reportes',
+        'menu_hijo': 'reporte_historial_precios',
+        'productos': productos,
+    }
+
+    return render(request, 'tienda/reporte_historial_precios.html', context)
+
+@solo_personal
+def buscar_historial_precios(request):
+    if request.method == 'POST':
+        fecha_inicio = request.POST.get('fecha_inicio')
+        fecha_fin = request.POST.get('fecha_fin')
+        producto_id = request.POST.get('producto_id')
+
+        periodos = VwPrecioVentaVigencia.objects.select_related('prod')
+
+        if producto_id and producto_id != '0':
+            periodos = periodos.filter(prod_id=producto_id)
+
+        # Periodos que se solapan con el rango [fecha_inicio, fecha_fin]
+        if fecha_fin:
+            periodos = periodos.filter(fecha_inicio__lt=fin_dia_exclusivo(fecha_fin))
+        if fecha_inicio:
+            periodos = periodos.filter(Q(fecha_fin__isnull=True) | Q(fecha_fin__gte=inicio_dia(fecha_inicio)))
+
+        # Un cambio en el mismo instante que el siguiente deja un periodo de duracion cero
+        periodos = periodos.filter(Q(fecha_fin__isnull=True) | Q(fecha_fin__gt=F('fecha_inicio')))
+
+        periodos = periodos.order_by('prod__prod_nombre', 'prod_id', '-fecha_inicio')
+
+        datos = []
+        productos_agregados = set()
+
+        for p in periodos:
+            prod = p.prod
+
+            if prod.prod_id not in productos_agregados:
+                datos.append({
+                    'separador': True,
+                    'producto': f"{prod.prod_nombre} - {prod.prod_modelo} - {prod.prod_marca}",
+                    'fecha_inicio': '',
+                    'fecha_fin': '',
+                    'costo': '',
+                    'margen': '',
+                    'precio_venta': '',
+                    'stock': '',
+                })
+                productos_agregados.add(prod.prod_id)
+
+            datos.append({
+                'separador': False,
+                'fecha_inicio': timezone.localtime(p.fecha_inicio).strftime('%Y-%m-%d %H:%M'),
+                'fecha_fin': timezone.localtime(p.fecha_fin).strftime('%Y-%m-%d %H:%M') if p.fecha_fin else 'Vigente',
+                'costo': str(p.hist_costo),
+                'margen': str(p.hist_margen),
+                'precio_venta': str(p.hist_precio_venta) if p.hist_stock > 0 else 'Sin stock',
+                'stock': p.hist_stock,
             })
 
         return JsonResponse({'datos': datos})
